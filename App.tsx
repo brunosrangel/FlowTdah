@@ -1,81 +1,98 @@
-
-import React, { useState } from 'react';
-import { Task, Screen } from './types';
-import HomeScreen from './screens/HomeScreen';
+import React from 'react';
+import { GoogleApiProvider } from './context/GoogleApiProvider';
+import { AppProvider, useAppContext } from './context/AppContext';
+import LoginScreen from './screens/LoginScreen';
+import PomodoroScreen from './screens/PomodoroScreen';
 import AddTaskScreen from './screens/AddTaskScreen';
-import FocusModeScreen from './screens/FocusModeScreen';
-import StatsScreen from './screens/StatsScreen';
-import PremiumScreen from './screens/PremiumScreen';
-import BottomNav from './components/BottomNav';
+import CalendarScreen from './screens/CalendarScreen';
+import SettingsScreen from './screens/SettingsScreen';
+import HomeScreen from './screens/HomeScreen';
+import BottomNavBar from './components/BottomNavBar';
+import VirtualAssistant from './components/VirtualAssistant';
+import Toast from './components/Toast';
 
-const App: React.FC = () => {
-  const [screen, setScreen] = useState<Screen>('home');
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: 1, title: 'Revisar relatório trimestral', category: 'Trabalho', status: 'pending', duration: 25 },
-    { id: 2, title: 'Aula de React Hooks', category: 'Estudo', status: 'pending', duration: 50 },
-    { id: 3, title: 'Meditar por 10 minutos', category: 'Pessoal', status: 'completed', duration: 10 },
-    { id: 4, title: 'Comprar mantimentos', category: 'Pessoal', status: 'pending', duration: 15 },
-  ]);
+const AppContent = () => {
+    const {
+        user,
+        pomodoroTask,
+        currentScreen,
+        editingTask,
+        isAssistantOpen,
+        toast,
+        handleLogin,
+        handleCompletePomodoroTask,
+        setPomodoroTask,
+        handleNavigate,
+        handleEditTask,
+        setIsAssistantOpen,
+        setToast,
+        tasks,
+        pomodoroSettings,
+        theme,
+        userActions,
+        taskActions
+    } = useAppContext();
 
-  const addTask = (task: Omit<Task, 'id' | 'status'>) => {
-    const newTask: Task = {
-      ...task,
-      id: Date.now(),
-      status: 'pending',
-    };
-    setTasks(prevTasks => [newTask, ...prevTasks]);
-    setScreen('home');
-  };
-
-  const deleteTask = (id: number) => {
-    setTasks(prevTasks => prevTasks.filter(task => task.id !== id));
-  };
-
-  const toggleTaskStatus = (id: number) => {
-    setTasks(prevTasks =>
-      prevTasks.map(task =>
-        task.id === id
-          ? { ...task, status: task.status === 'pending' ? 'completed' : 'pending' }
-          : task
-      )
-    );
-  };
-  
-  const onTaskCompleteFocus = (taskTitle: string) => {
-    setTasks(prevTasks => 
-        prevTasks.map(task => 
-            task.title.toLowerCase() === taskTitle.toLowerCase() && task.status === 'pending'
-            ? { ...task, status: 'completed' }
-            : task
-        )
-    );
-  };
-
-  const renderScreen = () => {
-    switch (screen) {
-      case 'home':
-        return <HomeScreen tasks={tasks} onToggleTask={toggleTaskStatus} onDeleteTask={deleteTask} onAddTask={() => setScreen('add_task')} />;
-      case 'add_task':
-        return <AddTaskScreen onAddTask={addTask} onBack={() => setScreen('home')} />;
-      case 'focus_mode':
-        return <FocusModeScreen tasks={tasks} onTaskComplete={onTaskCompleteFocus} />;
-      case 'stats':
-        return <StatsScreen tasks={tasks} />;
-      case 'premium':
-        return <PremiumScreen />;
-      default:
-        return <HomeScreen tasks={tasks} onToggleTask={toggleTaskStatus} onDeleteTask={deleteTask} onAddTask={() => setScreen('add_task')} />;
+    if (!user) {
+        return <LoginScreen onLogin={handleLogin} />;
     }
-  };
 
-  return (
-    <div className="bg-background min-h-screen font-sans text-text-primary pb-24">
-      <div className="max-w-lg mx-auto">
-        {renderScreen()}
-      </div>
-      <BottomNav currentScreen={screen} setScreen={setScreen} />
-    </div>
-  );
+    if (pomodoroTask) {
+        return (
+            <PomodoroScreen
+                task={pomodoroTask}
+                settings={pomodoroSettings}
+                onComplete={handleCompletePomodoroTask}
+                onExit={() => setPomodoroTask(null)}
+            />
+        );
+    }
+
+    const renderScreen = () => {
+        switch (currentScreen) {
+            case 'add':
+                return (
+                    <AddTaskScreen
+                        onBack={() => handleNavigate('home')}
+                        editingTask={editingTask}
+                    />
+                );
+            case 'calendar':
+                return <CalendarScreen tasks={tasks} onEdit={handleEditTask} />;
+            case 'settings':
+                return <SettingsScreen />;
+            case 'home':
+            default:
+                return (
+                    <HomeScreen />
+                );
+        }
+    };
+
+    return (
+        <>
+            {renderScreen()}
+            {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />}
+            {isAssistantOpen && <VirtualAssistant onAddTask={taskActions.addTask} onClose={() => setIsAssistantOpen(false)} />}
+            {currentScreen !== 'add' && (
+                <>
+                    <button className="assistant-fab" onClick={() => setIsAssistantOpen(true)} aria-label="Abrir assistente virtual">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2z"></path></svg>
+                    </button>
+                    <BottomNavBar currentScreen={currentScreen} onNavigate={handleNavigate} />
+                </>
+            )}
+        </>
+    );
 };
+
+
+const App = () => (
+    <GoogleApiProvider>
+        <AppProvider>
+            <AppContent />
+        </AppProvider>
+    </GoogleApiProvider>
+);
 
 export default App;
